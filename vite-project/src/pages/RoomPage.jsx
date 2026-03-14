@@ -7,17 +7,14 @@ export default function RoomPage() {
   const { roomId } = useParams();
   const navigate = useNavigate();
 
-  const API_BASE =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-  const SOCKET_URL = API_BASE.replace("/api", "");
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const SOCKET_URL = API_BASE.replace("/api", "");
 
   const socketRef = useRef(null);
   const peerRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const pendingCandidates = useRef([]);
-  const ringtoneRef = useRef(new Audio("/sounds/ringtone.mp3"));
   const incomingOfferRef = useRef(null);
 
   const user = JSON.parse(
@@ -42,6 +39,23 @@ export default function RoomPage() {
 
   const remoteUser = members.find((m) => m.id !== user.id);
   // ====================== SOCKET ======================
+
+  const ringtoneRef = useRef(new Audio("/sounds/ringtone.mp3"));
+
+useEffect(() => {
+  const unlockAudio = () => {
+    ringtoneRef.current.play()
+      .then(() => {
+        ringtoneRef.current.pause();
+        ringtoneRef.current.currentTime = 0;
+      })
+      .catch(() => {});
+
+    window.removeEventListener("click", unlockAudio);
+  };
+
+  window.addEventListener("click", unlockAudio);
+}, []);
   useEffect(() => {
     socketRef.current = io(SOCKET_URL, {
       transports: ["websocket"],
@@ -70,8 +84,10 @@ export default function RoomPage() {
     setIncomingCall(from);
 
     try {
-      ringtoneRef.current.currentTime = 0;
-      ringtoneRef.current.play();
+     ringtoneRef.current.currentTime = 0;
+ringtoneRef.current.play().catch(() => {
+  console.log("Ringtone blocked by browser");
+});
     } catch (err) {
       console.log("Ringtone blocked by browser");
     }
@@ -142,9 +158,14 @@ export default function RoomPage() {
   useEffect(() => {
   const fetchMessages = async () => {
     try {
-      const res = await fetch(`${API_BASE}/messages/${roomId}`);
-      const data = await res.json();
-      setMessages(data);
+     const res = await fetch(`${API_BASE}/messages/${roomId}`);
+     
+if (!res.ok) {
+  throw new Error(`HTTP error! status: ${res.status}`);
+}
+
+const data = await res.json();
+setMessages(data);
     } catch (err) {
       console.error("Error loading messages:", err);
     }
