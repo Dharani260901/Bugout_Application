@@ -117,26 +117,32 @@ export default function RoomPage() {
 });
 
     socketRef.current.on("webrtc-ice-candidate", async ({ candidate }) => {
-      if (!peerRef.current) return;
+  if (!peerRef.current) return;
 
-      const ice = new RTCIceCandidate(candidate);
+  try {
+    const ice = new RTCIceCandidate(candidate);
 
-      if (!peerRef.current.remoteDescription) {
-        pendingCandidates.current.push(ice);
-        return;
-      }
-
+    if (peerRef.current.remoteDescription) {
       await peerRef.current.addIceCandidate(ice);
-    });
+    } else {
+      pendingCandidates.current.push(ice);
+    }
+  } catch (err) {
+    console.error("ICE error:", err);
+  }
+});
 
-    return () => socketRef.current.disconnect();
+   return () => {
+  socketRef.current?.disconnect();
+  peerRef.current?.close();
+};
   }, [roomId, user.id]);
 
 
   useEffect(() => {
   const fetchMessages = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/messages/${roomId}`);
+      const res = await fetch(`${API_BASE}/messages/${roomId}`);
       const data = await res.json();
       setMessages(data);
     } catch (err) {
@@ -148,16 +154,32 @@ export default function RoomPage() {
 }, [roomId]);
   // ====================== PEER ======================
   const createPeer = () => {
-    peerRef.current = new RTCPeerConnection({
-     iceServers: [
-  { urls: "stun:stun.l.google.com:19302" },
-  // {
-  //   urls: "turn:global.relay.metered.ca:80",
-  //   username: "username",
-  //   credential: "password"
-  // }
-],
+  peerRef.current = new RTCPeerConnection({
+  iceServers: [
+    {
+      urls: "stun:stun.l.google.com:19302",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+  ],
+});
+
+    peerRef.current.onnegotiationneeded = async () => {
+  try {
+    const offer = await peerRef.current.createOffer();
+    await peerRef.current.setLocalDescription(offer);
+
+    socketRef.current.emit("webrtc-offer", {
+      roomId,
+      offer,
     });
+  } catch (err) {
+    console.error("Negotiation error:", err);
+  }
+};
 
     peerRef.current.onicecandidate = (event) => {
       if (event.candidate) {
@@ -168,16 +190,27 @@ export default function RoomPage() {
       }
     };
 
-    peerRef.current.ontrack = (event) => {
-      const [remoteStream] = event.streams;
-      remoteVideoRef.current.srcObject = remoteStream;
-      setRemoteStreamActive(true);
-      setRemoteVideoReady(true);
-    };
+   peerRef.current.ontrack = (event) => {
+  if (!remoteVideoRef.current.srcObject) {
+    remoteVideoRef.current.srcObject = new MediaStream();
+  }
+
+  remoteVideoRef.current.srcObject.addTrack(event.track);
+  remoteVideoRef.current
+    .play()
+    .catch(() => console.log("Autoplay blocked"));
+
+  setRemoteStreamActive(true);
+  setRemoteVideoReady(true);
+};
 
     peerRef.current.onconnectionstatechange = () => {
-      console.log("Connection State:", peerRef.current.connectionState);
-    };
+  console.log("Connection State:", peerRef.current.connectionState);
+};
+
+peerRef.current.oniceconnectionstatechange = () => {
+  console.log("ICE State:", peerRef.current.iceConnectionState);
+};
   };
 
   // ====================== CALLER ======================
@@ -204,13 +237,7 @@ export default function RoomPage() {
       peerRef.current.addTrack(track, stream);
     });
 
-    const offer = await peerRef.current.createOffer();
-    await peerRef.current.setLocalDescription(offer);
-
-    socketRef.current.emit("webrtc-offer", {
-      roomId,
-      offer,
-    });
+  
 
     setCallActive(true);
     setIsConnecting(false);
