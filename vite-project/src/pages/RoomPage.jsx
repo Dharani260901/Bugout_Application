@@ -16,7 +16,7 @@ const SOCKET_URL = API_BASE.replace("/api", "");
   const remoteVideoRef = useRef(null);
   const pendingCandidates = useRef([]);
   const incomingOfferRef = useRef(null);
-   let makingOffer = false;
+   const makingOffer = useRef(false);
 
   const user = JSON.parse(
     localStorage.getItem("user") || '{"id":"anon","name":"Anonymous"}',
@@ -173,7 +173,7 @@ setMessages(data);
   };
 
   fetchMessages();
-}, [roomId]);
+}, [roomId, API_BASE]);
   // ====================== PEER ======================
 
  
@@ -199,10 +199,11 @@ setMessages(data);
 ]
 });
 
-    peerRef.current.onnegotiationneeded = async () => {
+  peerRef.current.onnegotiationneeded = async () => {
   try {
-    if (makingOffer) return;
-    makingOffer = true;
+    if (makingOffer.current) return;
+
+    makingOffer.current = true;
 
     const offer = await peerRef.current.createOffer();
     await peerRef.current.setLocalDescription(offer);
@@ -211,10 +212,11 @@ setMessages(data);
       roomId,
       offer,
     });
+
   } catch (err) {
     console.error("Negotiation error:", err);
   } finally {
-    makingOffer = false;
+    makingOffer.current = false;
   }
 };
 
@@ -229,7 +231,9 @@ setMessages(data);
       }
     };
 
-  peerRef.current.ontrack = (event) => {
+peerRef.current.ontrack = (event) => {
+  console.log("Remote stream received:", event.streams);
+
   remoteVideoRef.current.srcObject = event.streams[0];
 
   setRemoteStreamActive(true);
