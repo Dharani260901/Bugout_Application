@@ -8,8 +8,7 @@ export default function RoomPage() {
   const navigate = useNavigate();
 
   const API_BASE =
-    import.meta.env.VITE_API_URL ||
-    "http://localhost:5000/api";
+  import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const SOCKET_URL = API_BASE.replace("/api", "");
 
