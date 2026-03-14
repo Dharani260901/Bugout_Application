@@ -79,8 +79,9 @@ export default function socketServer(server) {
     });
 
     socket.on("webrtc-ice-candidate", ({ roomId, candidate }) => {
-      socket.to(roomId).emit("webrtc-ice-candidate", { candidate });
-    });
+  console.log("ICE candidate received");
+  socket.to(roomId).emit("webrtc-ice-candidate", { candidate });
+});
 
     socket.on("video-toggle", ({ roomId, enabled }) => {
       socket.to(roomId).emit("remote-video-change", { enabled });
