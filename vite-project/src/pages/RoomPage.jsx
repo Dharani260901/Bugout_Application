@@ -16,6 +16,7 @@ const SOCKET_URL = API_BASE.replace("/api", "");
   const remoteVideoRef = useRef(null);
   const pendingCandidates = useRef([]);
   const incomingOfferRef = useRef(null);
+   let makingOffer = false;
 
   const user = JSON.parse(
     localStorage.getItem("user") || '{"id":"anon","name":"Anonymous"}',
@@ -152,7 +153,7 @@ ringtoneRef.current.play().catch(() => {
   socketRef.current?.disconnect();
   peerRef.current?.close();
 };
-  }, [roomId, user.id]);
+ }, [roomId, user.id, SOCKET_URL]);
 
 
   useEffect(() => {
@@ -174,6 +175,8 @@ setMessages(data);
   fetchMessages();
 }, [roomId]);
   // ====================== PEER ======================
+
+ 
   const createPeer = () => {
   peerRef.current = new RTCPeerConnection({
   iceServers: [
@@ -198,6 +201,9 @@ setMessages(data);
 
     peerRef.current.onnegotiationneeded = async () => {
   try {
+    if (makingOffer) return;
+    makingOffer = true;
+
     const offer = await peerRef.current.createOffer();
     await peerRef.current.setLocalDescription(offer);
 
@@ -207,10 +213,14 @@ setMessages(data);
     });
   } catch (err) {
     console.error("Negotiation error:", err);
+  } finally {
+    makingOffer = false;
   }
 };
 
     peerRef.current.onicecandidate = (event) => {
+      console.log("ICE candidate:", event.candidate);
+
       if (event.candidate) {
         socketRef.current.emit("webrtc-ice-candidate", {
           roomId,
@@ -219,15 +229,8 @@ setMessages(data);
       }
     };
 
-   peerRef.current.ontrack = (event) => {
-  if (!remoteVideoRef.current.srcObject) {
-    remoteVideoRef.current.srcObject = new MediaStream();
-  }
-
-  remoteVideoRef.current.srcObject.addTrack(event.track);
-  remoteVideoRef.current
-    .play()
-    .catch(() => console.log("Autoplay blocked"));
+  peerRef.current.ontrack = (event) => {
+  remoteVideoRef.current.srcObject = event.streams[0];
 
   setRemoteStreamActive(true);
   setRemoteVideoReady(true);
