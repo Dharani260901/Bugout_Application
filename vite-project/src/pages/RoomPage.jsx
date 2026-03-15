@@ -156,24 +156,24 @@ ringtoneRef.current.play().catch(() => {
  }, [roomId, user.id, SOCKET_URL]);
 
 
-  useEffect(() => {
-  const fetchMessages = async () => {
-    try {
-     const res = await fetch(`${API_BASE}/messages/${roomId}`);
+//   useEffect(() => {
+//   const fetchMessages = async () => {
+//     try {
+//      const res = await fetch(`${API_BASE}/messages/${roomId}`);
      
-if (!res.ok) {
-  throw new Error(`HTTP error! status: ${res.status}`);
-}
+// if (!res.ok) {
+//   throw new Error(`HTTP error! status: ${res.status}`);
+// }
 
-const data = await res.json();
-setMessages(data);
-    } catch (err) {
-      console.error("Error loading messages:", err);
-    }
-  };
+// const data = await res.json();
+// setMessages(data);
+//     } catch (err) {
+//       console.error("Error loading messages:", err);
+//     }
+//   };
 
-  fetchMessages();
-}, [roomId, API_BASE]);
+//   fetchMessages();
+// }, [roomId, API_BASE]);
   // ====================== PEER ======================
 
  
