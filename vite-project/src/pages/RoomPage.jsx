@@ -78,7 +78,9 @@ useEffect(() => {
 });
     
 
-    socketRef.current.on("members-update", setMembers);
+    socketRef.current.on("members-update", (data) => {
+  setMembers([...data]);
+});
 
      socketRef.current.on("room-inactive", () => {
   alert("Room is inactive because the admin is not online.");
@@ -165,7 +167,8 @@ ringtoneRef.current.play().catch(() => {
   }
 });
 
-   return () => {
+  return () => {
+  socketRef.current?.removeAllListeners();
   socketRef.current?.disconnect();
   peerRef.current?.close();
 };
@@ -409,7 +412,8 @@ peerRef.current.oniceconnectionstatechange = () => {
   };
 
   
-  const isAdmin = members.find((m) => m.id === user.id)?.role === "admin";
+const isAdmin =
+  members.find((m) => m.id === user.id)?.role?.toLowerCase() === "admin";
 
   
   /* ================= UI HELPERS ================= */
@@ -438,7 +442,10 @@ peerRef.current.oniceconnectionstatechange = () => {
         </div>
 
         <button
-          onClick={() => navigate("/dashboard")}
+         onClick={() => {
+  socketRef.current?.disconnect();
+  navigate("/dashboard");
+}}
           className="bg-slate-800 border border-slate-700 text-slate-300 hover:bg-red-500 hover:text-white hover:border-red-400 px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
         >
           Leave Session
@@ -463,9 +470,16 @@ peerRef.current.oniceconnectionstatechange = () => {
                   </div>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">
-                    {m.name.split(' ')[0]} {m.id === user.id && <span className="text-slate-500 text-[10px] font-medium">(You)</span>}
-                  </span>
+                 <span className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">
+  {m.name.split(" ")[0]}{" "}
+  {m.id === user.id && (
+    <span className="text-slate-500 text-[10px] font-medium">(You)</span>
+  )}
+</span>
+
+<span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">
+  {m.role?.toUpperCase() || "MEMBER"}
+</span>
                   {isAdmin && m.id !== user.id && (
   <button
     onClick={() =>
@@ -627,7 +641,16 @@ peerRef.current.oniceconnectionstatechange = () => {
               <input
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && inputMessage && (socketRef.current.emit("send-message", { roomId, ...user, message: inputMessage }), setInputMessage(""))}
+               onKeyDown={(e) => {
+  if (e.key === "Enter" && inputMessage.trim()) {
+    socketRef.current.emit("send-message", {
+      roomId,
+      ...user,
+      message: inputMessage.trim(),
+    });
+    setInputMessage("");
+  }
+}}
                 className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl px-5 py-4 text-sm focus:border-emerald-500/50 outline-none transition-all pr-14 font-medium"
                 placeholder="Secure message..."
               />
