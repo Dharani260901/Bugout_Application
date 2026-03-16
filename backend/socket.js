@@ -1,4 +1,5 @@
 import { Server } from "socket.io"; 
+import Message from "./models/Message.js"; 
 import RoomMember from "./models/RoomMember.js";
 import Room from "./models/Room.js";
 
