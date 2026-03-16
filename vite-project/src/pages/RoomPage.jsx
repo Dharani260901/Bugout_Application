@@ -130,25 +130,32 @@ ringtoneRef.current.play().catch(() => {
       pendingCandidates.current = [];
     });
 
-    socketRef.current.on("call-ended", () => {
-  console.log("Call ended by peer");
+  socketRef.current.on("call-ended", () => {
+  console.log("📴 Call ended by peer");
 
+  // Close peer connection
   if (peerRef.current) {
     peerRef.current.close();
     peerRef.current = null;
   }
 
+  // Stop local tracks
   if (localVideoRef.current?.srcObject) {
     localVideoRef.current.srcObject.getTracks().forEach(track => track.stop());
     localVideoRef.current.srcObject = null;
   }
 
+  // Clear remote video
   if (remoteVideoRef.current) {
     remoteVideoRef.current.srcObject = null;
   }
 
+  // Reset all call states
   setCallActive(false);
+  setIsConnecting(false);
+  setIncomingCall(null);
   setRemoteStreamActive(false);
+  setRemoteVideoReady(false);
 });
 
     socketRef.current.on("webrtc-ice-candidate", async ({ candidate }) => {
@@ -340,7 +347,8 @@ peerRef.current.oniceconnectionstatechange = () => {
   setIsConnecting(false);
 };
 
- const endCall = () => {
+const endCall = () => {
+  console.log("📴 Ending call");
 
   if (localVideoRef.current?.srcObject) {
     localVideoRef.current.srcObject.getTracks().forEach(track => track.stop());
@@ -357,11 +365,13 @@ peerRef.current.oniceconnectionstatechange = () => {
   }
 
   setCallActive(false);
+  setIsConnecting(false);
+  setIncomingCall(null);
   setRemoteStreamActive(false);
+  setRemoteVideoReady(false);
 
   socketRef.current.emit("end-call", { roomId });
 };
-
   const toggleCamera = () => {
     const track = localVideoRef.current?.srcObject?.getVideoTracks()[0];
     if (track) {
@@ -480,18 +490,22 @@ const isAdmin =
 <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">
   {m.role?.toUpperCase() || "MEMBER"}
 </span>
+              
                   {isAdmin && m.id !== user.id && (
-  <button
-    onClick={() =>
+<button
+  onClick={() => {
+    if (confirm(`Kick ${m.name}?`)) {
       socketRef.current.emit("kick-user", {
         roomId,
         userId: m.id,
-      })
+      });
     }
-    className="text-[9px] text-red-400 hover:text-red-300 mt-1"
-  >
-    Kick
-  </button>
+  }}
+  className="mt-1 px-2 py-0.5 text-[10px] font-bold rounded-full 
+             bg-red-500/20 text-red-400 hover:bg-red-500/30 transition"
+>
+  Kick
+</button>
 )}
             
                 </div>
