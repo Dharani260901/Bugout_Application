@@ -80,6 +80,22 @@ useEffect(() => {
 
     socketRef.current.on("members-update", setMembers);
 
+     socketRef.current.on("room-inactive", () => {
+  alert("Room is inactive because the admin is not online.");
+  navigate("/dashboard");
+});
+
+    socketRef.current.on("room-closed", () => {
+  alert("Admin left. Room closed.");
+  navigate("/dashboard");
+});
+
+socketRef.current.on("kicked", () => {
+  alert("You were removed by the admin.");
+  navigate("/dashboard");
+});
+
+
     socketRef.current.on("incoming-call", ({ from }) => {
   if (from.id !== user.id) {
     setIncomingCall(from);
@@ -393,6 +409,9 @@ peerRef.current.oniceconnectionstatechange = () => {
   };
 
   
+  const isAdmin = members.find((m) => m.id === user.id)?.role === "admin";
+
+  
   /* ================= UI HELPERS ================= */
   const getAvatarColor = (id = "") => {
     const colors = ["bg-indigo-500", "bg-emerald-500", "bg-rose-500", "bg-amber-500", "bg-cyan-500"];
@@ -447,9 +466,20 @@ peerRef.current.oniceconnectionstatechange = () => {
                   <span className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">
                     {m.name.split(' ')[0]} {m.id === user.id && <span className="text-slate-500 text-[10px] font-medium">(You)</span>}
                   </span>
-                  <span className="text-[9px] font-black text-emerald-500/60 uppercase tracking-widest">
-                    {m.role || 'Member'}
-                  </span>
+                  {isAdmin && m.id !== user.id && (
+  <button
+    onClick={() =>
+      socketRef.current.emit("kick-user", {
+        roomId,
+        userId: m.id,
+      })
+    }
+    className="text-[9px] text-red-400 hover:text-red-300 mt-1"
+  >
+    Kick
+  </button>
+)}
+            
                 </div>
               </div>
             ))}
