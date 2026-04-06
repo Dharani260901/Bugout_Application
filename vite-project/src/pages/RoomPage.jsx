@@ -21,7 +21,7 @@ export default function RoomPage() {
   const ringtoneRef = useRef(new Audio("/sounds/ringtone.mp3"));
   const incomingOfferRef = useRef(null);
 
- const user = JSON.parse(sessionStorage.getItem("user")) || '{"id":"anon","name":"Anonymous"}',
+ const user = JSON.parse(sessionStorage.getItem("user")) || '{"id":"anon","name":"Anonymous"}'
   );
 
   const [remoteVideoReady, setRemoteVideoReady] = useState(false);
