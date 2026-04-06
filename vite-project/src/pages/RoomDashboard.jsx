@@ -18,7 +18,7 @@ export default function RoomDashboard() {
   const navigate = useNavigate();
 
   /* ================= USER ================= */
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const user = JSON.parse(sessionStorage.getItem("user") || "{}");
 
   /* ================= STATES ================= */
   const [tab, setTab] = useState("create");
@@ -34,9 +34,7 @@ export default function RoomDashboard() {
 
   /* ================= LOGOUT ================= */
   const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
+    sessionStorage.clear();
     navigate("/login");
   };
 
