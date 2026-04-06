@@ -12,7 +12,7 @@ const api = axios.create({
 
 /* ================= REQUEST INTERCEPTOR ================= */
 api.interceptors.request.use((config) => {
-  const accessToken = localStorage.getItem("accessToken");
+  const accessToken = sessionStorage.getItem("accessToken");
 
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
@@ -31,13 +31,13 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem("refreshToken");
+        const refreshToken = sessionStorage.getItem("refreshToken");
 
         const res = await axios.post(`${API_URL}/auth/refresh`, {
           refreshToken,
         });
 
-        localStorage.setItem("accessToken", res.data.accessToken);
+        sessionStorage.setItem("accessToken", res.data.accessToken);
 
         originalRequest.headers.Authorization =
           `Bearer ${res.data.accessToken}`;
