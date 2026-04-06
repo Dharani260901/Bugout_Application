@@ -15,7 +15,7 @@ export default function Login() {
     try {
       await loginApi({ email, password });
       toast.success("Login successful");
-      navigate("/dashboard");
+      window.location.href = "/dashboard";
     } catch (err) {
       toast.error(err.message);
     }
