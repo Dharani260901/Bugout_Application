@@ -23,7 +23,7 @@ sessionStorage.setItem("user", JSON.stringify(data.user));
 
 /* -------- LOGOUT -------- */
 export const logoutApi = async () => {
-  await api.post("/api/auth/logout");
+  await api.post("/auth/logout");
 
   localStorage.clear();
 };
