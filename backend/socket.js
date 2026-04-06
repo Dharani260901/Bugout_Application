@@ -1,7 +1,9 @@
-import { Server } from "socket.io"; 
-import Message from "./models/Message.js"; 
+import { Server } from "socket.io";
+import Message from "./models/Message.js";
 import RoomMember from "./models/RoomMember.js";
 import Room from "./models/Room.js";
+import jwt from "jsonwebtoken";
+import User from "./models/User.js";
 
 const onlineUsers = {}; // socketId -> { roomCode, roomId, user }
 
@@ -13,51 +15,63 @@ export default function socketServer(server) {
     },
   });
 
+  /* ================= SOCKET AUTH (NEW 🔥) ================= */
+  io.use((socket, next) => {
+    try {
+      const token = socket.handshake.auth?.token;
+
+      if (!token) {
+        return next(new Error("No token"));
+      }
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+      socket.userId = decoded.id; // ✅ NEW: secure user identity
+      next();
+    } catch (err) {
+      console.error("Socket auth error:", err.message);
+      next(new Error("Unauthorized"));
+    }
+  });
+
   io.on("connection", (socket) => {
     console.log("🔌 Connected:", socket.id);
 
     /* ================= JOIN ROOM ================= */
-    socket.on("join-room", async ({ roomId, user }) => {
+    socket.on("join-room", async ({ roomId }) => {
       try {
+        const userId = socket.userId;
+
+        const user = await User.findById(userId);
         const room = await Room.findOne({ roomCode: roomId });
-        if (!room) return;
+
+        if (!room || !user) return;
 
         const member = await RoomMember.findOne({
           roomId: room._id,
-          userId: user.id,
+          userId: userId,
         });
 
-        /* ===== CHECK IF ADMIN IS ONLINE ===== */
-        const adminOnline = Object.values(onlineUsers).some(
-          (u) => u.roomCode === roomId && u.user.role === "admin"
-        );
-
-        /* Allow admin to join even if nobody is online */
-        if (!adminOnline && member?.role !== "admin") {
-          socket.emit("room-inactive");
-          return;
-        }
-
-        socket.join(roomId);
-
-        room.lastActiveAt = new Date();
-        await room.save();
+        /* ================= JOIN SOCKET ROOM (NEW 🔥) ================= */
+        socket.join(roomId); // ✅ NEW: ensures proper broadcasting
 
         /* Remove previous socket if same user reconnects */
         for (const [sockId, data] of Object.entries(onlineUsers)) {
           if (
-            data.user.id === user.id &&
+            data.user.id === user._id.toString() &&
             data.roomId.toString() === room._id.toString()
           ) {
             delete onlineUsers[sockId];
           }
         }
 
+        /* ================= SAFE USER OBJECT (UPDATED 🔥) ================= */
         onlineUsers[socket.id] = {
           roomCode: roomId,
           roomId: room._id,
           user: {
-            ...user,
+            id: user._id.toString(), // ✅ NEW: safe id
+            name: user.name,         // ✅ NEW: only needed fields
             role: member?.role || "member",
           },
         };
@@ -77,9 +91,14 @@ export default function socketServer(server) {
       }
     });
 
-    /* ================= CALL + CHAT ================= */
+    /* ================= CALL ================= */
 
-    socket.on("call-start", ({ roomId, user }) => {
+    /* ❌ REMOVED frontend user trust */
+    socket.on("call-start", ({ roomId }) => {
+      const user = onlineUsers[socket.id]?.user; // ✅ NEW: trusted user
+
+      if (!user) return;
+
       socket.to(roomId).emit("incoming-call", { from: user });
     });
 
@@ -92,7 +111,6 @@ export default function socketServer(server) {
     });
 
     socket.on("webrtc-ice-candidate", ({ roomId, candidate }) => {
-      console.log("ICE candidate received");
       socket.to(roomId).emit("webrtc-ice-candidate", { candidate });
     });
 
@@ -112,14 +130,21 @@ export default function socketServer(server) {
       socket.to(roomId).emit("remote-speaking", { speaking });
     });
 
-    socket.on("send-message", async ({ roomId, id, name, message }) => {
+    /* ================= CHAT ================= */
+
+    /* ❌ REMOVED frontend id/name trust */
+    socket.on("send-message", async ({ roomId, message }) => {
       try {
+        const user = onlineUsers[socket.id]?.user; // ✅ NEW: trusted user
+
+        if (!user) return;
+
         const savedMessage = await Message.create({
           roomId,
-          senderId: id,
-          senderName: name,
+          senderId: user.id,        // ✅ NEW
+          senderName: user.name,    // ✅ NEW
           message,
-          readBy: [id],
+          readBy: [user.id],
         });
 
         io.to(roomId).emit("receive-message", savedMessage);
@@ -128,74 +153,27 @@ export default function socketServer(server) {
       }
     });
 
-    /* ================= ADMIN KICK USER ================= */
-
-    socket.on("kick-user", ({ roomId, userId }) => {
-      const admin = onlineUsers[socket.id];
-
-      if (!admin || admin.user.role !== "admin") return;
-
-      const target = Object.entries(onlineUsers).find(
-        ([, data]) =>
-          data.user.id === userId && data.roomCode === roomId
-      );
-
-      if (!target) return;
-
-      const [targetSocketId] = target;
-
-      io.to(targetSocketId).emit("kicked");
-      io.sockets.sockets.get(targetSocketId)?.leave(roomId);
-
-      delete onlineUsers[targetSocketId];
-
-      const members = Object.values(onlineUsers)
-        .filter((u) => u.roomCode === roomId)
-        .map((u) => ({
-          id: u.user.id,
-          name: u.user.name,
-          role: u.user.role,
-          status: "online",
-        }));
-
-      io.to(roomId).emit("members-update", members);
-    });
-
     /* ================= DISCONNECT ================= */
 
-    socket.on("disconnect", async () => {
+    socket.on("disconnect", () => {
       const data = onlineUsers[socket.id];
-      if (!data) return;
 
-      /* ===== ADMIN LEFT → CLOSE ROOM ===== */
-      if (data.user.role === "admin") {
-        try {
-          await RoomMember.deleteMany({ roomId: data.roomId });
-          await Message.deleteMany({ roomId: data.roomCode });
+      if (data) {
+        delete onlineUsers[socket.id];
 
-          io.to(data.roomCode).emit("room-closed");
+        const members = Object.values(onlineUsers)
+          .filter((u) =>
+            u.roomId.toString() === data.roomId.toString()
+          )
+          .map((u) => ({
+            id: u.user.id,
+            name: u.user.name,
+            role: u.user.role,
+            status: "online",
+          }));
 
-          delete onlineUsers[socket.id];
-
-          console.log("🚨 Admin left. Room closed:", data.roomCode);
-          return;
-        } catch (err) {
-          console.error("Room cleanup error:", err);
-        }
+        io.to(data.roomCode).emit("members-update", members);
       }
-
-      delete onlineUsers[socket.id];
-
-      const members = Object.values(onlineUsers)
-        .filter((u) => u.roomCode === data.roomCode)
-        .map((u) => ({
-          id: u.user.id,
-          name: u.user.name,
-          role: u.user.role,
-          status: "online",
-        }));
-
-      io.to(data.roomCode).emit("members-update", members);
 
       console.log("❌ Disconnected:", socket.id);
     });
