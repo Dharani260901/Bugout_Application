@@ -4,10 +4,9 @@ import api from "./axios";
 export const signupApi = async (payload) => {
   const { data } = await api.post("/auth/signup", payload);
 
-  localStorage.setItem("accessToken", data.accessToken);
-  localStorage.setItem("refreshToken", data.refreshToken);
-  localStorage.setItem("user", JSON.stringify(data.user));
-
+ sessionStorage.setItem("accessToken", data.accessToken);
+sessionStorage.setItem("refreshToken", data.refreshToken);
+sessionStorage.setItem("user", JSON.stringify(data.user));
   return data;
 };
 
@@ -15,15 +14,16 @@ export const signupApi = async (payload) => {
 export const loginApi = async (payload) => {
   const { data } = await api.post("/auth/login", payload);
 
-  localStorage.setItem("accessToken", data.accessToken);
-  localStorage.setItem("refreshToken", data.refreshToken);
-  localStorage.setItem("user", JSON.stringify(data.user));
+sessionStorage.setItem("accessToken", data.accessToken);
+sessionStorage.setItem("refreshToken", data.refreshToken);
+sessionStorage.setItem("user", JSON.stringify(data.user));
 
   return data;
 };
 
 /* -------- LOGOUT -------- */
 export const logoutApi = async () => {
-  await api.post("/auth/logout");
+  await api.post("/api/auth/logout");
+
   localStorage.clear();
 };
