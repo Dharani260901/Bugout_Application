@@ -340,10 +340,12 @@ const handleAnswer = async () => {
   const sendMessage = () => {
   if (!inputMessage.trim()) return;
 
-  socketRef.current.emit("send-message", {
-    roomId,
-    message: inputMessage,
-  });
+socketRef.current.emit("send-message", {
+  roomId,
+  id: user.id,
+  name: user.name,
+  message: inputMessage,
+});
 
   setInputMessage("");
 };
