@@ -21,8 +21,9 @@ export default function RoomPage() {
   const ringtoneRef = useRef(new Audio("/sounds/ringtone.mp3"));
   const incomingOfferRef = useRef(null);
 
- const user = JSON.parse(sessionStorage.getItem("user")) || '{"id":"anon","name":"Anonymous"}'
-  );
+ const user = JSON.parse(
+  sessionStorage.getItem("user") || '{"id":"anon","name":"Anonymous"}'
+);
 
   const [remoteVideoReady, setRemoteVideoReady] = useState(false);
   const [roomName, setRoomName] = useState("Secure Session");
@@ -56,7 +57,7 @@ export default function RoomPage() {
   socketRef.current.emit("join-room", { roomId });
 
   // ✅ IMPORTANT FIX
-  socketRef.current.emit("join-socket-room", roomId);
+  
 });
 
 
@@ -226,17 +227,13 @@ const handleAnswer = async () => {
     ringtoneRef.current.currentTime = 0;
 
     if (!incomingOfferRef.current) {
-  console.log("⏳ Waiting for offer...");
-  return;
-}
+      console.log("⏳ Waiting for offer...");
+      return;
+    }
 
     if (!peerRef.current) createPeer();
 
-    // ✅ ONLY PLACE WHERE REMOTE IS SET
-    await peerRef.current.setRemoteDescription(
-      new RTCSessionDescription(incomingOfferRef.current)
-    );
-
+    // ✅ GET MEDIA FIRST
     const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
       audio: true,
@@ -244,10 +241,17 @@ const handleAnswer = async () => {
 
     localVideoRef.current.srcObject = stream;
 
+    // ✅ ADD TRACKS FIRST
     stream.getTracks().forEach((track) => {
       peerRef.current.addTrack(track, stream);
     });
 
+    // ✅ THEN SET REMOTE
+    await peerRef.current.setRemoteDescription(
+      new RTCSessionDescription(incomingOfferRef.current)
+    );
+
+    // ✅ CREATE ANSWER
     const answer = await peerRef.current.createAnswer();
     await peerRef.current.setLocalDescription(answer);
 
@@ -259,6 +263,7 @@ const handleAnswer = async () => {
     setIncomingCall(null);
     setCallActive(true);
     setIsConnecting(false);
+
   } catch (err) {
     console.error("Answer error:", err);
   }
@@ -342,8 +347,6 @@ const handleAnswer = async () => {
 
 socketRef.current.emit("send-message", {
   roomId,
-  id: user.id,
-  name: user.name,
   message: inputMessage,
 });
 
