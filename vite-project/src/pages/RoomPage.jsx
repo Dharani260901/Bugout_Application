@@ -53,8 +53,11 @@ export default function RoomPage() {
     socketRef.current.removeAllListeners();
 
     socketRef.current.on("connect", () => {
-      socketRef.current.emit("join-room", { roomId }); // ✅ UPDATED (removed user)
-    });
+  socketRef.current.emit("join-room", { roomId });
+
+  // ✅ IMPORTANT FIX
+  socketRef.current.emit("join-socket-room", roomId);
+});
 
 
     socketRef.current.on("receive-message", (msg) => {
